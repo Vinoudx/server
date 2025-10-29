@@ -1,7 +1,8 @@
 #include "scheduler_thread.hpp"
 
 #include <sys/epoll.h>
-#include <string.h>
+#include <sys/timerfd.h>
+#include <string.h> 
 
 #include "io_scheduler.hpp"
 #include "logger.hpp"
@@ -15,7 +16,9 @@ SchedulerThread::SchedulerThread(IoScheduler* scheduler)
         :m_stopped(false)
         ,m_num_ready_fibers(0)
         ,m_num_hold_fibers(0)
-        ,m_scheduler(scheduler){
+        ,m_scheduler(scheduler)
+        ,Timer(timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK | TFD_CLOEXEC)){
+    
     if(pipe(m_pipe)){
         LOG_FATAL << "SchedulerThread::SchedulerThread() pipe fail " << strerror(errno);
     }
@@ -37,6 +40,14 @@ SchedulerThread::SchedulerThread(IoScheduler* scheduler)
         LOG_FATAL << "SchedulerThread::SchedulerThread() epoll_ctl fail " << strerror(errno);
     }
 
+    // timer fd
+    struct epoll_event tevent;
+    memset(&tevent, 0, sizeof(tevent));
+    tevent.events = EPOLLIN | EPOLLET | EPOLLEXCLUSIVE;
+    tevent.data.fd = m_timer_fd;
+    if(epoll_ctl(m_epoll, EPOLL_CTL_ADD, m_timer_fd, &tevent)){
+        LOG_FATAL << "SchedulerThread::SchedulerThread() epoll_ctl fail " << strerror(errno);
+    }
 
     m_thread = std::shared_ptr<Thread>(new Thread(std::bind(&SchedulerThread::run, this)));
 }
@@ -98,7 +109,7 @@ void SchedulerThread::run(){
     Fiber::ptr worker_fiber = nullptr;
     Fiber::ptr idle_fiber = std::shared_ptr<Fiber>(new Fiber(std::bind(&SchedulerThread::idle, this)));
     while(!stopping()){
-        LOG_DEBUG << "ready queue size " << m_ready_queue.size();
+        // LOG_DEBUG << "ready queue size " << m_ready_queue.size();
         for(auto it = m_ready_queue.begin(); it != m_ready_queue.end(); ++it){
             if((*it)->getState() == Fiber::State::TERM || 
                (*it)->getState() == Fiber::State::EXCE){
@@ -114,7 +125,7 @@ void SchedulerThread::run(){
             }
         }
         if(worker_fiber != nullptr){
-            LOG_DEBUG << "get task at " << worker_fiber.get();
+            // LOG_DEBUG << "get task at " << worker_fiber.get();
             worker_fiber->swapIn();
             if(worker_fiber->getState() == Fiber::State::TERM || 
                 worker_fiber->getState() == Fiber::State::EXCE){
@@ -158,12 +169,10 @@ void SchedulerThread::idle(){
     std::vector<struct epoll_event> events;
     events.resize(s_epoll_max_events);
     while(!stopping()){
-        LOG_DEBUG << "epoll_wait";
         int n = epoll_wait(m_epoll, &(*events.begin()), events.size(), -1);
         if(n == -1){
             LOG_ERROR << "SchedulerThread::idle() epoll_wait fail" << strerror(errno);
         }
-        LOG_DEBUG << "has " << n << " events occured";
         for(int i = 0; i < n; i++){
 
             if(events[i].data.fd == m_pipe[1]){
@@ -191,8 +200,34 @@ void SchedulerThread::idle(){
                 Fiber::YeildToReady();
                 continue;
             }
-            if(events[i].data.fd == m_timerfd){
-                // 先不做
+            if(events[i].data.fd == m_timer_fd){
+                uint64_t temp;
+                while (true) {
+                    ssize_t n = read(m_timer_fd, &temp, sizeof(uint64_t));
+                    if (n > 0) {
+                        break;
+                    } else if (n == 0) {
+                        // 对端关闭
+                        LOG_ERROR << "fd close";
+                        break;
+                    } else {
+                        if (errno == EINTR)
+                            continue; // 信号中断重试
+                        else if (errno == EAGAIN || errno == EWOULDBLOCK)
+                            break; // 缓冲区读完
+                        else {
+                            LOG_ERROR << "SchedulerThread::idle() read pipe fail " << strerror(errno);
+                            break;
+                        }
+                    }
+                }
+                std::vector<TimerTask::ptr> tasks;
+                getExpiredTasks(tasks);
+                // LOG_DEBUG << "get " << tasks.size() << " timers";
+                for(auto& task: tasks){
+                    addTask(std::bind(&TimerTask::triggerTask, task));
+                }
+                continue;
             }
             
             int fd = events[i].data.fd;
@@ -210,6 +245,7 @@ void SchedulerThread::idle(){
     close(m_epoll);
     close(m_pipe[0]);
     close(m_pipe[1]);
+    close(m_timer_fd);
     LOG_DEBUG << "ilde finish";
 }
 

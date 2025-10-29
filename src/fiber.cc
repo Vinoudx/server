@@ -47,7 +47,7 @@ Fiber::Fiber():m_state(READY),m_stack(nullptr){
     if(getcontext(&m_context)){
         LOG_ERROR << "Fiber::Fiber() " << strerror(errno);
     }
-    LOG_DEBUG << "Fiber::Fiber() main fiber " << m_id; 
+    // LOG_DEBUG << "Fiber::Fiber() main fiber " << m_id; 
 }
 
 Fiber::Fiber(std::function<void()> cb, StateListenerCallback rcb, StateListenerCallback bcb)
@@ -69,7 +69,7 @@ Fiber::Fiber(std::function<void()> cb, StateListenerCallback rcb, StateListenerC
     m_context.uc_link = nullptr;
 
     makecontext(&m_context, &Fiber::mainFunc, 0);
-    LOG_DEBUG << "Fiber " << m_id << " created and start";
+    // LOG_DEBUG << "Fiber " << m_id << " created and start";
     changeState(READY);
 }
 
@@ -79,7 +79,7 @@ Fiber::~Fiber(){
     m_cb = nullptr;
     m_on_block_listenercb = nullptr;
     m_on_ready_listenercb = nullptr;
-    LOG_DEBUG << "Fiber::~Fiber() id = " << m_id;
+    // LOG_DEBUG << "Fiber::~Fiber() id = " << m_id;
 }
 
 void Fiber::swapIn(){
@@ -122,7 +122,7 @@ void Fiber::reset(std::function<void()> cb, StateListenerCallback rcb, StateList
     m_context.uc_link = nullptr;
 
     makecontext(&m_context, &Fiber::mainFunc, 0);
-    LOG_DEBUG << "Fiber " << m_id << " reset";
+    // LOG_DEBUG << "Fiber " << m_id << " reset";
     changeState(READY);
 }
 

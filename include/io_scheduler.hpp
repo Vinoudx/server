@@ -6,6 +6,7 @@
 
 #include "scheduler_thread.hpp"
 #include "fiber.hpp"
+#include "timer.hpp"
 
 namespace furina{
 
@@ -22,7 +23,8 @@ public:
     void delEvent(int fd, int event);
     void delAllEvents(int fd);
 
-    void addTimer(uint64_t time_ms, std::function<void()> cb);
+    TimerTask::ptr addTimer(uint64_t time_ms, bool isrecurrent,  std::function<void()> cb);
+    void delTimer(TimerTask::ptr timer);
 
     void stop();
 

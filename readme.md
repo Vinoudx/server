@@ -29,6 +29,13 @@ scheduler管理所有scheduler thread
      sendto/recvfrom 给udp/kcp
 
 
+## timestamp
+使用steady_clock产生一个不被系统时间影响的单调uint64时间戳
+
+## socket
+通过继承实现tcpsocket，udpsocket，kcpsocket
+实现bind，listen, accept，相关read/write
+
 ## 细节
 在swapcontext前要把这个函数里的所有shared_ptr都释放掉
 在swapcontext后不保证执行流还会回到这里，所以应该在swapcontext前把该释放的都释放了

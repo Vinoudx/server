@@ -8,12 +8,13 @@
 
 #include "thread.hpp"
 #include "fiber.hpp"
+#include "timer.hpp"
 
 namespace furina{
 
 class IoScheduler;
 
-class SchedulerThread{
+class SchedulerThread: public Timer{
 public:
     using ptr = std::shared_ptr<SchedulerThread>;
     using uptr = std::unique_ptr<SchedulerThread>;
@@ -74,8 +75,6 @@ private:
     std::map<int, EventContext::ptr> m_events;
 
     IoScheduler* m_scheduler;
-
-    int m_timerfd;
 };
 
 }

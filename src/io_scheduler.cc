@@ -57,8 +57,14 @@ void IoScheduler::delAllEvents(int fd){
     m_threads[index]->delAllEvents(fd);
 }
 
-void IoScheduler::addTimer(uint64_t time_ms, std::function<void()> cb){
-    LOG_INFO << "TODO";
+TimerTask::ptr IoScheduler::addTimer(uint64_t time_ms, bool isrecurrent, std::function<void()> cb){
+    size_t index = getNextIndex();
+    return m_threads[index]->addTimer(time_ms, isrecurrent, cb);
+}
+
+void IoScheduler::delTimer(TimerTask::ptr timer){
+    size_t index = getNextIndex();
+    m_threads[index]->delTimer(timer);
 }
 
 void IoScheduler::stop(){
