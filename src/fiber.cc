@@ -130,14 +130,14 @@ void Fiber::YeildToHold(){
     Fiber::ptr now_fiber = getExecFiber();
     Fiber* row_ptr = now_fiber.get();
     now_fiber.reset();
-    now_fiber->changeState(HOLD);
+    row_ptr->changeState(HOLD);
     row_ptr->swapOut();
 }
 
 void Fiber::YeildToReady(){
     Fiber::ptr now_fiber = getExecFiber();
     Fiber* row_ptr = now_fiber.get();
-    now_fiber->changeState(READY);
+    row_ptr->changeState(READY);
     row_ptr->swapOut();
 }
 

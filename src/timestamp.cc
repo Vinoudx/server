@@ -1,5 +1,7 @@
 #include "timestamp.hpp"
 
+#include <time.h>
+
 namespace furina{
 
 Timestamp::Timestamp(uint64_t now)
@@ -7,6 +9,10 @@ Timestamp::Timestamp(uint64_t now)
 
 Timestamp Timestamp::now(){
     return Timestamp(std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now().time_since_epoch()).count());
+}
+
+Timestamp Timestamp::nowAbs(){
+    return Timestamp(time(nullptr));
 }
 
 uint64_t Timestamp::getNowTime(){

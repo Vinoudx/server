@@ -23,18 +23,28 @@ scheduler管理所有scheduler thread
 基于steady_clock，timerfd超时时间为当前时间到计时器超时的绝对时间差
 注意向红黑树加入事件时，如果事件的超时事件为最早的要重置timerfd
 
+## timestamp
+使用steady_clock产生一个不被系统时间影响的单调uint64时间戳，单位为ms
+
 ## hook
 采用静态函数形式的hook
 先修改read/write 给tcp
      sendto/recvfrom 给udp/kcp
 
-
-## timestamp
-使用steady_clock产生一个不被系统时间影响的单调uint64时间戳
-
 ## socket
-通过继承实现tcpsocket，udpsocket，kcpsocket
-实现bind，listen, accept，相关read/write
+
+实现bind，listen, accept，相关read/write等
+
+关于使用和返回socket的情况，都使用Socket类
+
+可以通过getTcpSocket和getUdpSocket获得socket
+
+## socket manager
+管理所有socket，提供根据fd拿到Socket对象的方法
+可以给udp广播实现一个拿到空闲socket的方法
+
+## server
+注意hook后的io都是同步语义完成异步操作
 
 ## 细节
 在swapcontext前要把这个函数里的所有shared_ptr都释放掉

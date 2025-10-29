@@ -13,6 +13,7 @@ public:
     Timestamp(uint64_t now);
 
     static Timestamp now();
+    static Timestamp nowAbs();
     static uint64_t nowTimeMs();
     uint64_t getNowTime();
 private:

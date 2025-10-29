@@ -57,10 +57,12 @@ SchedulerThread::~SchedulerThread(){
 }
 
 void SchedulerThread::onFiberReady(Fiber::ptr fiber){
+    // LOG_DEBUG << "on fiber ready " << fiber.get();
     std::lock_guard<std::mutex> l(m_mtx);
     // 将fiber移动到ready队列
     for(auto it = m_hold_queue.begin(); it != m_hold_queue.end(); ++it){
         if(*it == fiber){
+            // LOG_DEBUG << "find hold fiber at " << *it;
             m_ready_queue.emplace_back(std::move(*it));
             m_hold_queue.erase(it);
             m_num_ready_fibers++;
@@ -72,6 +74,7 @@ void SchedulerThread::onFiberReady(Fiber::ptr fiber){
 }
 
 void SchedulerThread::onFiberHold(Fiber::ptr fiber){
+    // LOG_DEBUG << "on fiber hold " << fiber.get();
     std::lock_guard<std::mutex> l(m_mtx);
     // 将fiber移动到hold队列
     for(auto it = m_ready_queue.begin(); it != m_ready_queue.end(); ++it){
@@ -86,7 +89,7 @@ void SchedulerThread::onFiberHold(Fiber::ptr fiber){
 }
 
 void SchedulerThread::addTask(Fiber::ptr fiber){
-    LOG_DEBUG << "addTask";
+    // LOG_DEBUG << "addTask";
     // 在不同线程下的执行，需要加锁
     std::lock_guard<std::mutex> l(m_mtx);
     m_ready_queue.push_back(fiber);
@@ -138,6 +141,8 @@ void SchedulerThread::run(){
                 m_ready_queue.emplace_back(std::move(worker_fiber));
             }else if(worker_fiber->getState() == Fiber::State::READY){
                 m_ready_queue.emplace_back(std::move(worker_fiber));
+            }else if(worker_fiber->getState() == Fiber::State::HOLD){
+                m_hold_queue.emplace_back(std::move(worker_fiber));
             }
             worker_fiber = nullptr;
         }else{
@@ -234,6 +239,7 @@ void SchedulerThread::idle(){
             auto event_it = m_events.find(fd);
             if(event_it == m_events.end()){
                 LOG_ERROR << "why not found???";
+                continue;
             }
             event_it->second->setActualEvents(events[i].events);
             event_it->second->handleEvent();
@@ -270,7 +276,9 @@ void SchedulerThread::addEvent(int fd, int event, std::function<void()> cb){
     EventContext::ptr ctx = nullptr;
     int epoll_operation = 0;
     if(it == m_events.end()){
+        LOG_DEBUG << "event context not found";
         ctx = std::shared_ptr<EventContext>(new EventContext(fd, this));
+        m_events.insert_or_assign(fd, ctx);
         epoll_operation = EPOLL_CTL_ADD;
     }else{
         ctx = it->second;
@@ -280,8 +288,8 @@ void SchedulerThread::addEvent(int fd, int event, std::function<void()> cb){
     struct epoll_event epollevent;
     memset(&epollevent, 0, sizeof(epollevent));
     epollevent.events = ctx->registerd_events | event | EPOLLET;
-    epollevent.data.fd = ctx->fd;
-    if(epoll_ctl(m_epoll, epoll_operation, ctx->fd, &epollevent)){
+    epollevent.data.fd = fd;
+    if(epoll_ctl(m_epoll, epoll_operation, fd, &epollevent)){
         LOG_ERROR << "SchedulerThread::addEvent() epoll_ctl fail " << strerror(errno);
     }else{
         if(event & EventContext::Event::READ){
@@ -290,6 +298,7 @@ void SchedulerThread::addEvent(int fd, int event, std::function<void()> cb){
             ctx->write_task = cb;
         }
         ctx->registerd_events |= event;
+        ctx->fd = fd;
     }
 }
 

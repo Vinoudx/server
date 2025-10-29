@@ -3,6 +3,7 @@
 #include <memory>
 #include <functional>
 #include <vector>
+#include <unordered_map>
 
 #include "scheduler_thread.hpp"
 #include "fiber.hpp"
@@ -26,6 +27,7 @@ public:
     TimerTask::ptr addTimer(uint64_t time_ms, bool isrecurrent,  std::function<void()> cb);
     void delTimer(TimerTask::ptr timer);
 
+    void start();
     void stop();
 
     bool isClosed(){return m_closed;}
@@ -38,6 +40,8 @@ private:
     size_t m_num_threads;
     bool m_closed;
     size_t m_roundrobin_next_index;
+    std::unordered_map<int, size_t> m_fd_to_index;
+    
 };
 
 void setThisThreadScheduler(IoScheduler* scheduler);
