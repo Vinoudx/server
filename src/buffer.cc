@@ -73,6 +73,14 @@ uint64_t Buffer::readUint64(){
     return result;
 }
 
+void Buffer::readNBytes(char* buffer, size_t n){
+    read(buffer, n);
+}
+
+void Buffer::writeNBytes(const char* buffer, size_t n){
+    write(buffer, n);
+}
+
 size_t Buffer::readableBytes(){
     if(m_readBegin <= m_writeBegin){
         return m_writeBegin - m_readBegin;
@@ -84,6 +92,7 @@ size_t Buffer::readableBytes(){
 size_t Buffer::writeableBytes(){
     return m_capacity - readableBytes() - 1;
 }
+
 
 void Buffer::write(const void* buf, size_t size){
     if(writeableBytes() < size)[[unlikely]]{

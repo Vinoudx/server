@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "address.hpp"
+#include "buffer.hpp"
 
 namespace furina{
 
@@ -10,35 +11,40 @@ class Socket{
 public:
     using ptr = std::shared_ptr<Socket>;
 
-    ssize_t recv(void *buf, size_t len, int flags){}
-    ssize_t send(const void *buf, size_t len, int flags){}
-    ssize_t sendto(const void *buf, size_t len, int flags,
-                          const struct sockaddr *dest_addr, socklen_t addrlen){}
-    ssize_t recvfrom(void *buf, size_t len, int flags,
-                            struct sockaddr *src_addr, socklen_t *addrlen){}
-    
-    int connect(InetAddress::ptr address){}
-    Socket::ptr accept(){}
+    Socket(int family, int type, int protocal);
+    ~Socket(){if(m_isValid)close();}
 
-    int bind(InetAddress::ptr addr){}
-    int listen(int backlog){}
-    void close(){}
+    ssize_t read(Buffer::ptr buffer);
+    ssize_t write(const std::string& buffer);
+
+    ssize_t recv(Buffer::ptr buffer, int flags);
+    ssize_t send(const std::string& buffer, int flags);
+    ssize_t recvfrom(Buffer::ptr buffer, int flags);
+    ssize_t sendto(const std::string& buffer, int flags);
+    
+    int connect(InetAddress::ptr address);
+    Socket::ptr accept();
+
+    int bind(InetAddress::ptr addr);
+    int listen(int backlog);
+    void close();
 
     InetAddress::ptr getPeerAddr()const{return m_peer_address;}
     InetAddress::ptr getLocalAddr()const{return m_local_address;}
 
-    int isValid() const{return m_valid;}
+    void setPeerAddr(const InetAddress::ptr& addr){m_peer_address = addr;}
+
     int getFamily() const{return m_family;}
     int getType() const{return m_type;}
-    int getFlag() const{return m_flag;}
+    int getProtocal() const{return m_protocal;}
     int getFd() const{return m_fd;}
 
 private:
     int m_family;
     int m_type;
-    int m_flag;
+    int m_protocal;
     int m_fd;
-    bool m_valid;
+    bool m_isValid;
     InetAddress::ptr m_peer_address;
     InetAddress::ptr m_local_address;
 };

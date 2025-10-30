@@ -15,7 +15,7 @@ readBegin               writeBegin
 
 class Buffer{
 public:
-    using ptr_t = std::shared_ptr<Buffer>;
+    using ptr = std::shared_ptr<Buffer>;
 
     Buffer(size_t defaultCapacity = 4096);
     ~Buffer();
@@ -32,16 +32,21 @@ public:
 
     bool hasReadableBytes(){return m_readBegin != m_writeBegin;}
     bool hasWriteableBytes(){return advance(m_writeBegin, 1) != m_readBegin;}
+ 
+    void readNBytes(char* buffer, size_t n);
+    void writeNBytes(const char* buffer, size_t n);
 
 private:
+
+    void write(const void* buf, size_t size);
+    void read(void* buf, size_t size);
 
     size_t advance(size_t ptr, size_t n);
 
     // 只能往大了resize
     void resize(size_t n);
 
-    void write(const void* buf, size_t size);
-    void read(void* buf, size_t size);
+
 
     char* m_buffer;
     size_t m_capacity;
