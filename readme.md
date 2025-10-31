@@ -45,6 +45,7 @@ scheduler管理所有scheduler thread
 
 ## server
 注意hook后的io都是同步语义完成异步操作
+注意handlemessage时候把socket的事件加到socket所在的线程上，使用getThisThreadSchedulerThread()
 
 ## 细节
 在swapcontext前要把这个函数里的所有shared_ptr都释放掉

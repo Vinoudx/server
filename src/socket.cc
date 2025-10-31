@@ -18,6 +18,8 @@ Socket::Socket(int family, int type, int protocal)
     :m_family(family)
     ,m_type(type)
     ,m_protocal(protocal){
+    m_peer_address = InetAddress::createEmptyAddr();
+    m_local_address = InetAddress::createEmptyAddr();
     m_fd = ::socket(family, type | SOCK_NONBLOCK, protocal);
     if(m_fd <= 0){
         LOG_ERROR << "Socket::Socket() socket fail " << strerror(errno);
