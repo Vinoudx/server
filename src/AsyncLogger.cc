@@ -46,7 +46,7 @@ AsyncLogger::~AsyncLogger(){
 void AsyncLogger::log(int fd, const std::string& content){
     std::unique_lock<std::mutex> l(mtx_);
     bufferA_->push(fd, content);    
-    // if(bufferA_->isFull()){
+    if(bufferA_->isFull()){
         fullBuffers_.emplace_back(std::move(bufferA_));
         if(bufferB_ != nullptr){
             bufferA_.swap(bufferB_);
@@ -54,7 +54,7 @@ void AsyncLogger::log(int fd, const std::string& content){
             bufferA_ = std::make_unique<vecBuffer>();
         }
         cv_.notify_one();
-    // }
+    }
 }
 
 void AsyncLogger::flush(){

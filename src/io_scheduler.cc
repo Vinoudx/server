@@ -60,14 +60,20 @@ void IoScheduler::addEvent(int fd, int event, std::function<void()> cb){
 }
 
 void IoScheduler::delEvent(int fd, int event){
-    size_t index = m_fd_to_index.at(fd);
-    // LOG_DEBUG << "del event at index " << index;
-    m_threads[index]->delEvent(fd, event);
+    // size_t index = m_fd_to_index.at(fd);
+    // // LOG_DEBUG << "del event at index " << index;
+    // m_threads[index]->delEvent(fd, event);
+    for(auto& thread: m_threads){
+        thread->delEvent(fd, event);
+    }
 }
 
 void IoScheduler::delAllEvents(int fd){
-    size_t index = getNextIndex();
-    m_threads[index]->delAllEvents(fd);
+    // size_t index = m_fd_to_index.at(fd);
+    // LOG_DEBUG << "del all event at index " << index << " fd = " << fd; 
+    // m_threads[index]->delAllEvents(fd);
+    delEvent(fd, READ);
+    delEvent(fd, WRITE);
 }
 
 TimerTask::ptr IoScheduler::addTimer(uint64_t time_ms, bool isrecurrent, std::function<void()> cb){

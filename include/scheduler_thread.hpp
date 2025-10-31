@@ -77,4 +77,6 @@ private:
     IoScheduler* m_scheduler;
 };
 
+SchedulerThread* getThisThreadSchedulerThread();
+
 }

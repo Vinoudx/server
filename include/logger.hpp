@@ -17,7 +17,7 @@
 #define GET_LOGGER
 
 #define LOG(level) \
-            std::make_unique<furina::LoggerWapper>(furina::LogLevel::level, furina::Logger::ptr_t(new furina::Logger), furina::LogEvent::ptr_t(new furina::LogEvent(__FILE__, __LINE__, furina::getThreadId(), furina::getFiberId(), time(0))))->getSS()
+            std::make_unique<furina::LoggerWapper>(furina::LogLevel::level, furina::Logger::ptr_t(new furina::Logger), furina::LogEvent::ptr_t(new furina::LogEvent(__FILE__, __LINE__, furina::getThreadId(), furina::getFiberId(), ::time(NULL))))->getSS()
 
 #define LOG_DEBUG LOG(DEBUG)
 #define LOG_INFO LOG(INFO)

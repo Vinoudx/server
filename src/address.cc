@@ -18,7 +18,14 @@ InetAddress::ptr InetAddress::createAddr(const char* ipv4, uint16_t port){
 }
 
 InetAddress::ptr InetAddress::createEmptyAddr(){
-    return std::make_shared<InetAddress>();
+    return std::make_shared<InetAddress>("0.0.0.0", 0);
+}
+
+std::string InetAddress::dump(){
+    std::string str(inet_ntoa(m_addr.sin_addr));
+    str.append(":");
+    str.append(std::to_string(ntohs(m_addr.sin_port)));
+    return str;
 }
 
 }

@@ -6,6 +6,12 @@
 
 namespace furina{
 
+enum Event{
+    NONE = 0x000,
+    READ = 0x001,
+    WRITE = 0x004
+};
+
 #define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 

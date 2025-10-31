@@ -4,6 +4,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <memory>
+#include <string>
 
 namespace furina{
 
@@ -15,12 +16,14 @@ public:
     static InetAddress::ptr createEmptyAddr();
 
     InetAddress(const char* ipv4, uint16_t port);
-    InetAddress() = default;
+    InetAddress() = delete;
     const sockaddr* getAddr() const{return (sockaddr*)&m_addr;}
     socklen_t getLength() const{return m_len;}
 
     sockaddr* getMutableAddr() {return (sockaddr*)&m_addr;}
     socklen_t* getMutableLength() {return &m_len;}
+
+    std::string dump();
 
 private:
     struct sockaddr_in m_addr;

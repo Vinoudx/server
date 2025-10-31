@@ -3,6 +3,8 @@
 #include <string.h>
 #include <string>
 
+#include "logger.hpp"
+
 namespace furina{
 
 Buffer::Buffer(size_t defaultCapacity)
@@ -40,7 +42,7 @@ void Buffer::writeString(const std::string& str){
 std::string Buffer::readString(){
     uint64_t len = readUint64();
     std::string temp;
-    temp.resize(len + 1);
+    temp.resize(len);
     read(temp.data(), len);
     return temp;
 }
@@ -118,6 +120,7 @@ void Buffer::write(const void* buf, size_t size){
 
 void Buffer::read(void* buf, size_t size){
     if(readableBytes() < size)[[unlikely]]{
+        LOG_ERROR << "has " << readableBytes() << " Bytes, but need " << size << " Bytes";
         throw std::logic_error("no enough data");
     }
     if(m_capacity - m_readBegin >= size){

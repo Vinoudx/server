@@ -4,6 +4,7 @@
 #include <functional>
 #include <vector>
 #include <unordered_map>
+#include <atomic>
 
 #include "scheduler_thread.hpp"
 #include "fiber.hpp"
@@ -39,7 +40,7 @@ private:
     std::vector<SchedulerThread::uptr> m_threads;
     size_t m_num_threads;
     bool m_closed;
-    size_t m_roundrobin_next_index;
+    std::atomic<size_t> m_roundrobin_next_index;
     std::unordered_map<int, size_t> m_fd_to_index;
     
 };

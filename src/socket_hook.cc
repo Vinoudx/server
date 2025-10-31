@@ -6,11 +6,11 @@
 
 namespace furina{
 
-static uint64_t s_io_timeout_ms = 50000;
+static int64_t s_io_timeout_ms = -1;
 
 template<typename Func, typename... Args>
 static ssize_t do_io(Func func, int fd, const char* name, int event, Args&& ...args){
-    LOG_DEBUG << "do " << name;
+    // LOG_DEBUG << "do " << name;
     IoScheduler* ios = getThisThreadScheduler();
     bool is_time_out = false;
     while(true){
@@ -21,20 +21,23 @@ static ssize_t do_io(Func func, int fd, const char* name, int event, Args&& ...a
         }
         if(n == -1 && errno == EAGAIN){
             auto this_fiber = getExecFiber(); 
-            LOG_DEBUG << "this_fiber " << this_fiber.get();
-            auto timer = ios->addTimer(s_io_timeout_ms, false, [&this_fiber, &ios, fd, &is_time_out, &event]{
-                    ios->delEvent(fd, event);
-                    errno = ETIMEDOUT;
-                    is_time_out = true;
-                    this_fiber->resume();
-            });
-            LOG_DEBUG << "addEvent " << "timer " << timer.get();
+            // LOG_DEBUG << "this_fiber " << this_fiber.get();
+            TimerTask::ptr timer = nullptr;
+            if(s_io_timeout_ms != -1){
+                timer = ios->addTimer(s_io_timeout_ms, false, [&this_fiber, &ios, fd, &is_time_out, &event]{
+                        ios->delEvent(fd, event);
+                        errno = ETIMEDOUT;
+                        is_time_out = true;
+                        this_fiber->resume();
+                });
+            }
+            // LOG_DEBUG << "addEvent " << "timer " << timer.get();
             ios->addEvent(fd, event, [&this_fiber, &ios]{
                 this_fiber->resume();
             });
 
             Fiber::YeildToHold();
-            LOG_DEBUG << "continue";
+            // LOG_DEBUG << "continue";
             if(is_time_out){
                 return -1;
             }
@@ -74,11 +77,13 @@ ssize_t SocketHook::recvfrom(int sockfd, void *buf, size_t len, int flags,
 }
 
 int SocketHook::connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen){
-    return ::connect(sockfd, addr, addrlen);
+    // return ::connect(sockfd, addr, addrlen);
+    return do_io(::connect, sockfd, "connect", READ, addr, addrlen);
 }
 
 int SocketHook::accept(int s, struct sockaddr *addr, socklen_t *addrlen){
-    return ::accept(s, addr, addrlen);
+    // return ::accept(s, addr, addrlen);
+    return do_io(::accept, s, "accept", READ, addr, addrlen);
 }
 
 int SocketHook::listen(int fd, int backlog){

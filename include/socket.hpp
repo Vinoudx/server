@@ -38,8 +38,17 @@ public:
     int getType() const{return m_type;}
     int getProtocal() const{return m_protocal;}
     int getFd() const{return m_fd;}
+    bool isClosed() const{return !m_isValid;}
+
+    bool setBlock();
+    bool setNonBlock();
+    void setReuseAddr();
+    void setNoDelay();
 
 private:
+
+    Socket(int fd, const InetAddress::ptr& peer_addr);
+
     int m_family;
     int m_type;
     int m_protocal;
