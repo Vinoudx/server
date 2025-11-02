@@ -15,8 +15,8 @@ namespace furina{
 class TcpServer{
 public:
     using ptr = std::shared_ptr<TcpServer>;
-    using OnConnectionCallback = std::function<void(Socket::ptr, Timestamp)>;
-    using OnMessageCallback = std::function<void(Socket::ptr, Buffer::ptr, Timestamp)>;
+    using OnConnectionCallback = std::function<void(TcpSocket::ptr, Timestamp)>;
+    using OnMessageCallback = std::function<void(TcpSocket::ptr, Buffer::ptr, Timestamp)>;
 
     TcpServer(size_t num_threads, const InetAddress::ptr& local_address);
 
@@ -38,10 +38,12 @@ public:
 private:
 
     void handleConnection();
-    void handleMessage(Socket::ptr sock);
+    void handleMessage(TcpSocket::ptr sock);
+
+    std::unordered_map<int, TcpSocket::ptr> m_fd_to_socket;
 
     InetAddress::ptr m_local_address;
-    Socket::ptr m_listen_socket;
+    TcpSocket::ptr m_listen_socket;
     IoScheduler::ptr m_ios;
     size_t m_num_threads;
     std::atomic_bool m_isRunning;

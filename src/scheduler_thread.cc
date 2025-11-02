@@ -16,6 +16,9 @@ static uint8_t s_epoll_event_expand_ratio = 2;
 static thread_local SchedulerThread* s_this_thread_scheduler = nullptr;
 
 SchedulerThread* getThisThreadSchedulerThread(){
+    if(unlikely(s_this_thread_scheduler == nullptr)){
+        LOG_FATAL << "getThisThreadSchedulerThread() why use this way???";
+    }
     return s_this_thread_scheduler;
 }
 
@@ -184,7 +187,8 @@ void SchedulerThread::idle(){
     while(!stopping()){
         int n = epoll_wait(m_epoll, &(*events.begin()), events.size(), -1);
         if(n == -1){
-            LOG_ERROR << "SchedulerThread::idle() epoll_wait fail" << strerror(errno);
+            LOG_ERROR << "SchedulerThread::idle() epoll_wait fail " << strerror(errno);
+            continue;
         }
         for(int i = 0; i < n; i++){
 
@@ -260,7 +264,6 @@ void SchedulerThread::idle(){
     close(m_pipe[0]);
     close(m_pipe[1]);
     close(m_timer_fd);
-    // LOG_DEBUG << "ilde finish";
 }
 
 void SchedulerThread::stop(){
@@ -268,15 +271,21 @@ void SchedulerThread::stop(){
     if(m_stopped){
         return;
     }
-    for(auto it = m_events.begin(); it != m_events.end(); it++){
-        delAllEvents(it->first);
+    std::vector<int> keys;
+    for (auto& kv : m_events) {
+        keys.push_back(kv.first);
+    }
+
+    for (int key : keys) {
+        delAllEvents(key);
     }
     m_stopped = true;
     tickle();
 }
 
 bool SchedulerThread::stopping(){
-    return m_stopped == true && m_ready_queue.empty() && m_hold_queue.empty() && m_events.empty();
+    // return m_stopped == true && m_ready_queue.empty() && m_hold_queue.empty() && m_events.empty();
+    return m_stopped;
 }
 
 void SchedulerThread::addEvent(int fd, int event, std::function<void()> cb){
@@ -312,7 +321,6 @@ void SchedulerThread::addEvent(int fd, int event, std::function<void()> cb){
 void SchedulerThread::delEvent(int fd, int event){
     auto it = m_events.find(fd);
     if(it == m_events.end()){
-        LOG_INFO << "SchedulerThread::delEvent() fd=" << fd << " not found";
         return;
     }
     EventContext::ptr ctx = it->second;
@@ -362,6 +370,7 @@ void SchedulerThread::EventContext::setActualEvents(int events){
 }
 
 void SchedulerThread::EventContext::handleEvent(){
+    LOG_DEBUG << "event " << actual_events << " on fd = " << fd; 
     if((actual_events & READ) && (registerd_events & READ)){
         thread->addTask(read_task);
         thread->delEvent(fd, READ);

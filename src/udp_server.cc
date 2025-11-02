@@ -23,7 +23,7 @@ UdpServer::~UdpServer(){
 }
 
 void UdpServer::setMessageCallback(OnMessageCallback cb){
-    m_message_cb = std::move(cb);
+    m_message_cb = cb;
 }
 
 TimerTask::ptr UdpServer::addTimer(uint64_t time_ms, bool isrecurrent,  std::function<void()> cb){
@@ -39,8 +39,7 @@ void UdpServer::start(){
     m_ios = IoScheduler::ptr(new IoScheduler(m_num_threads));    
     m_ios->start();
     for(int i = 0; i < m_num_threads; i++){
-        Socket::ptr sock = SocketManager::getInstance()->createUdpSocket();
-        LOG_INFO << "get socket fd = " << sock->getFd();
+        UdpSocket::ptr sock = UdpSocket::createUdpSocket();
         sock->setReuseAddr();
         sock->setNonBlock();
         sock->bind(m_local_address);
@@ -53,7 +52,7 @@ void UdpServer::stop(){
     m_ios->stop();
 }
 
-void UdpServer::handleMessage(Socket::ptr sock){
+void UdpServer::handleMessage(UdpSocket::ptr sock){
     if(sock->isClosed())return;
     auto buffer = Buffer::ptr(new Buffer);
     int n = sock->recvfrom(buffer, 0);
@@ -79,6 +78,11 @@ void UdpServer::waitingForStop(){
     sigemptyset(&sigset);
     sigaddset(&sigset, SIGINT);
     sigaddset(&sigset, SIGTERM);
+    if (pthread_sigmask(SIG_BLOCK, &sigset, nullptr) != 0) {
+        LOG_ERROR << "UdpServer::waitingForStop() pthread_sigmask";
+        stop();
+        return;
+    }
     int sig;
     sigwait(&sigset, &sig);
     LOG_INFO << "Server closed due to Ctrl+C";

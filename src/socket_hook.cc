@@ -6,7 +6,7 @@
 
 namespace furina{
 
-static int64_t s_io_timeout_ms = -1;
+static int64_t s_io_timeout_ms = 5000;
 
 template<typename Func, typename... Args>
 static ssize_t do_io(Func func, int fd, const char* name, int event, Args&& ...args){

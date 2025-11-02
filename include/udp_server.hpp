@@ -15,7 +15,7 @@ namespace furina{
 class UdpServer{
 public:
     using ptr = std::shared_ptr<UdpServer>;
-    using OnMessageCallback = std::function<void(Socket::ptr, Buffer::ptr, Timestamp)>;
+    using OnMessageCallback = std::function<void(UdpSocket::ptr, Buffer::ptr, Timestamp)>;
 
     UdpServer(size_t num_threads, const InetAddress::ptr& local_address);
 
@@ -33,7 +33,7 @@ public:
 
 private:
 
-    void handleMessage(Socket::ptr sock);
+    void handleMessage(UdpSocket::ptr sock);
 
     InetAddress::ptr m_local_address;
     IoScheduler::ptr m_ios;

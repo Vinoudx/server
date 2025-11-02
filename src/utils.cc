@@ -2,6 +2,8 @@
 
 #include "fiber.hpp"
 
+#include <unistd.h>
+
 namespace furina{
 
 static thread_local size_t t_thisThreadId = (size_t)-1;

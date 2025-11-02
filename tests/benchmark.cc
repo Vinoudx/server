@@ -15,10 +15,10 @@ using namespace std::chrono;
 
 // 配置参数
 const int MSG_SIZE = 8;          // 每条消息大小
-const int NUM_CONN = 15;         // 并发连接数
+const int NUM_CONN = 1;         // 并发连接数
 const int DURATION_SEC = 10;      // 测试时长（秒）
 const string SERVER_IP = "127.0.0.1";
-const int SERVER_PORT = 8124;
+const int SERVER_PORT = 8890;
 
 // 全局计数器
 atomic<long> g_count{0};

@@ -7,40 +7,30 @@
 #include "socket_hook.hpp"
 #include "logger.hpp"
 #include "macro.hpp"
-#include "socket_manager.hpp"
-#include "io_scheduler.hpp"
+#include "scheduler_thread.hpp"
 
 namespace furina{
 
 static size_t s_max_read = 4096;
 
-Socket::Socket(int family, int type, int protocal)
-    :m_family(family)
-    ,m_type(type)
-    ,m_protocal(protocal){
-    m_peer_address = InetAddress::createEmptyAddr();
-    m_local_address = InetAddress::createEmptyAddr();
-    m_fd = ::socket(family, type | SOCK_NONBLOCK, protocal);
+////////////////////////////////////////////////////////////////////////////////////////////
+
+Socket::Socket(int fd):m_fd(fd),m_isValid(true){
     if(m_fd <= 0){
         LOG_ERROR << "Socket::Socket() socket fail " << strerror(errno);
     }
-    m_isValid = true;
-}
-
-Socket::Socket(int fd, const InetAddress::ptr& peer_addr){
-    m_fd = fd;
-    m_peer_address = peer_addr;
-    m_isValid = false;
+    m_peer_address = InetAddress::createEmptyAddr();
+    m_local_address = InetAddress::createEmptyAddr();
 }
 
 bool Socket::setBlock(){
     int flags = fcntl(m_fd, F_GETFL, 0);
     if (flags == -1) {
-        LOG_ERROR << "Socket::setBlock() fail" << strerror(errno);
+        LOG_ERROR << "TcpSocket::setBlock() fail" << strerror(errno);
         return false;
     }
     if (fcntl(m_fd, F_SETFL, flags & ~O_NONBLOCK) == -1) {
-        LOG_ERROR << "Socket::setBlock() fail" << strerror(errno);
+        LOG_ERROR << "TcpSocket::setBlock() fail" << strerror(errno);
         return false;
     }
     return true;
@@ -50,7 +40,7 @@ void Socket::setNoDelay(){
     int flag = 1;
     int ret = setsockopt(m_fd, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(flag));
     if (ret == -1) {
-        LOG_ERROR << "Socket::setNoDelay() fail" << strerror(errno);
+        LOG_ERROR << "TcpSocket::setNoDelay() fail" << strerror(errno);
         return;
     }
 }
@@ -58,11 +48,11 @@ void Socket::setNoDelay(){
 bool Socket::setNonBlock(){
     int flags = fcntl(m_fd, F_GETFL, 0);
     if (flags == -1) {
-        LOG_ERROR << "Socket::setBlock() fail" << strerror(errno);
+        LOG_ERROR << "TcpSocket::setNonBlock() fail" << strerror(errno);
         return false;
     }
     if (fcntl(m_fd, F_SETFL, flags & O_NONBLOCK) == -1) {
-        LOG_ERROR << "Socket::setBlock() fail" << strerror(errno);
+        LOG_ERROR << "TcpSocket::setNonBlock() fail" << strerror(errno);
         return false;
     }
     return true;
@@ -70,13 +60,45 @@ bool Socket::setNonBlock(){
 
 void Socket::setReuseAddr(){
     int opt = 1;
-    setsockopt(m_fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
-    setsockopt(m_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    if(setsockopt(m_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt))){
+        LOG_ERROR << "Socket::setReuseAddr() setsockopt fail " << strerror(errno);
+    }
 }
 
-ssize_t Socket::read(Buffer::ptr buffer){
-    if(m_type & SOCK_DGRAM | !m_isValid){
-        LOG_ERROR << "cannot apply read on udp socket or closed socket";
+void Socket::setReusePort(){
+    int opt = 1;
+    if(setsockopt(m_fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt))){
+        LOG_ERROR << "Socket::setReuseAddr() setsockopt fail " << strerror(errno);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////
+
+TcpSocket::TcpSocket(int protocal):Socket(::socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, protocal)){
+    m_protocal = protocal;
+}
+
+TcpSocket::TcpSocket(int fd, const InetAddress::ptr& peer_addr):Socket(fd){
+    m_peer_address = peer_addr;
+    m_protocal = 0;
+    if(getsockname(m_fd, m_local_address->getMutableAddr(), m_local_address->getMutableLength())){
+        LOG_ERROR << "TcpSocket::TcpSocket() getsockname fail " << strerror(errno);
+    }
+}
+
+TcpSocket::~TcpSocket(){
+    this->close();
+    ::close(m_fd);
+    m_isValid = false;
+}
+
+TcpSocket::ptr TcpSocket::createTcpSocket(int protocal){
+    return TcpSocket::ptr(new TcpSocket(protocal));
+}
+
+ssize_t TcpSocket::read(Buffer::ptr buffer){
+    if(!m_isValid){
+        LOG_ERROR << "TcpSocket closed";
         return -1;
     }
     char temp[4096] = {0};
@@ -86,40 +108,99 @@ ssize_t Socket::read(Buffer::ptr buffer){
     return n;
 }
 
-ssize_t Socket::write(const std::string& buffer){
-    if(m_type & SOCK_DGRAM | !m_isValid){
-        LOG_ERROR << "cannot apply write on udp socket or closed socket";
+ssize_t TcpSocket::write(const std::string& buffer){
+    if(!m_isValid){
+        LOG_ERROR << "TcpSocket closed";
         return -1;
     }
     return SocketHook::write(m_fd, buffer.c_str(), buffer.size());
 }
 
-ssize_t Socket::recv(Buffer::ptr buffer, int flags){
-    if(m_type & SOCK_DGRAM | !m_isValid){
-        LOG_ERROR << "cannot apply recv on udp socket or closed socket";
+ssize_t TcpSocket::recv(Buffer::ptr buffer, int flags){
+    if(!m_isValid){
+        LOG_ERROR << "TcpSocket closed";
         return -1;
     }
-
     char temp[4096] = {0};
     int n = SocketHook::recv(m_fd, temp, 4096, flags);
     if(n == -1 || n == 0)return n;
     buffer->writeString(std::string(temp, n));
-    // LOG_DEBUG << "come " << n << " Bytes, buffer have " << buffer->readableBytes();
     return n;
 }
 
-ssize_t Socket::send(const std::string& buffer, int flags){
-    if(m_type & SOCK_DGRAM | !m_isValid){
-        LOG_ERROR << "cannot apply send on udp socket or closed socket";
+ssize_t TcpSocket::send(const std::string& buffer, int flags){
+    if(!m_isValid){
+        LOG_ERROR << "TcpSocket closed";
         return -1;
     }
     return SocketHook::send(m_fd, buffer.c_str(), buffer.size(), flags);
 }
 
-ssize_t Socket::recvfrom(Buffer::ptr buffer, int flags){
-    
-    if(!(m_type & SOCK_DGRAM) | !m_isValid){
-        LOG_ERROR << "cannot apply sendto on not udp socket or closed socket";
+int TcpSocket::connect(InetAddress::ptr address){
+    if(!m_isValid){
+        LOG_ERROR << "TcpSocket closed";
+        return -1;
+    }
+    return SocketHook::connect(m_fd, address->getAddr(), address->getLength());
+}
+
+TcpSocket::ptr TcpSocket::accept(){
+    if(!m_isValid){
+        LOG_ERROR << "TcpSocket closed";
+        return nullptr;
+    }
+    InetAddress::ptr addr = InetAddress::createEmptyAddr();
+    int new_fd = SocketHook::accept(m_fd, addr->getMutableAddr(), addr->getMutableLength());
+    TcpSocket::ptr new_sock = std::shared_ptr<TcpSocket>(new TcpSocket(new_fd, addr));
+    new_sock->setNonBlock();
+    new_sock->setNoDelay();
+    return new_sock;
+}
+
+int TcpSocket::bind(InetAddress::ptr addr){
+    if(!m_isValid){
+        LOG_ERROR << "TcpSocket closed";
+        return -1;
+    }
+    m_local_address = addr;
+    return SocketHook::bind(m_fd, m_local_address->getAddr(), m_local_address->getLength());
+}
+
+int TcpSocket::listen(int backlog){
+    if(!m_isValid){
+        LOG_ERROR << "TcpSocket closed";
+        return -1;
+    }
+    return SocketHook::listen(m_fd, backlog);
+}
+
+void TcpSocket::close(){
+    if(!m_isValid)return;
+    m_isValid = false;
+    SchedulerThread* ios = getThisThreadSchedulerThread();
+    ios->delAllEvents(m_fd);
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+UdpSocket::UdpSocket(int protocal):Socket(::socket(AF_INET, SOCK_DGRAM, protocal)){
+    m_protocal = protocal;
+}
+
+UdpSocket::~UdpSocket(){
+    LOG_DEBUG << "fd " << m_fd << " closed";
+    this->close();
+    ::close(m_fd);
+    m_isValid = false;
+}
+
+UdpSocket::ptr UdpSocket::createUdpSocket(int protocal){
+    return UdpSocket::ptr(new UdpSocket(protocal));
+}
+
+ssize_t UdpSocket::recvfrom(Buffer::ptr buffer, int flags){
+    if(!m_isValid){
+        LOG_ERROR << "UdpSocket closed";
         return -1;
     }
     char temp[4096] = {0};
@@ -128,68 +209,34 @@ ssize_t Socket::recvfrom(Buffer::ptr buffer, int flags){
     buffer->writeString(std::string(temp, n));
     return n;
 }
-ssize_t Socket::sendto(const std::string& buffer, int flags){
-    if(!(m_type & SOCK_DGRAM) | !m_isValid){
-        LOG_ERROR << "cannot apply recvfrom on not udp socket or closed socket";
+
+ssize_t UdpSocket::sendto(const std::string& buffer, int flags){
+    if(!m_isValid){
+        LOG_ERROR << "UdpSocket closed";
         return -1;
     }
     return SocketHook::sendto(m_fd, buffer.c_str(), buffer.size(), flags, m_peer_address->getAddr(), m_peer_address->getLength());    
 }
 
-int Socket::connect(InetAddress::ptr address){
-    if(!m_isValid){
-        LOG_ERROR << "socket closed";
-        return -1;
-    }
-    return SocketHook::connect(m_fd, address->getAddr(), address->getLength());
+ssize_t UdpSocket::sendto(const std::string& buffer, const InetAddress::ptr& addr, int flags){
+    m_peer_address = addr;
+    return sendto(buffer, flags);   
 }
 
-Socket::ptr Socket::accept(){
+int UdpSocket::bind(InetAddress::ptr addr){
     if(!m_isValid){
-        LOG_ERROR << "socket closed";
-        return nullptr;
-    }
-    InetAddress::ptr addr = InetAddress::createEmptyAddr();
-    int new_fd = SocketHook::accept(m_fd, addr->getMutableAddr(), addr->getMutableLength());
-    // LOG_DEBUG << new_fd << " " << addr->dump();
-    Socket::ptr new_sock = std::shared_ptr<Socket>(new Socket(new_fd, addr));
-    new_sock->setNonBlock();
-    new_sock->setNoDelay();
-    // LOG_DEBUG << addr->getAddr()->sa_family;
-    new_sock->m_local_address = m_local_address;
-    new_sock->m_family = m_family;
-    new_sock->m_type = m_type;
-    new_sock->m_protocal = m_protocal;
-    new_sock->m_isValid = true;
-    SocketManager::getInstance()->insertSocket(new_sock);
-    return new_sock;
-}
-
-int Socket::bind(InetAddress::ptr addr){
-    if(!m_isValid){
-        LOG_ERROR << "socket closed";
+        LOG_ERROR << "UdpSocket closed";
         return -1;
     }
     m_local_address = addr;
     return SocketHook::bind(m_fd, m_local_address->getAddr(), m_local_address->getLength());
 }
 
-int Socket::listen(int backlog){
-    if(!m_isValid){
-        LOG_ERROR << "socket closed";
-        return -1;
-    }
-    return SocketHook::listen(m_fd, backlog);
-}
-
-void Socket::close(){
+void UdpSocket::close(){
     if(!m_isValid)return;
-    LOG_DEBUG << "Socket::close() on fd " << m_fd;
-    IoScheduler* ios = getThisThreadScheduler();
-    ios->delAllEvents(m_fd);
-    SocketManager::getInstance()->closeSocket(m_fd);
     m_isValid = false;
-    ::close(m_fd);
+    SchedulerThread* ios = getThisThreadSchedulerThread();
+    ios->delAllEvents(m_fd);
 }
 
 }

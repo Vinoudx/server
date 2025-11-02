@@ -1,5 +1,7 @@
 #include "socket_manager.hpp"
 
+#if 0
+
 namespace furina{
 
 Socket::ptr SocketManager::getTcpSocket(int fd){
@@ -54,8 +56,10 @@ void SocketManager::closeSocket(int fd){
     std::unique_lock<std::shared_mutex> l(m_mtx);
     auto it = m_sockets.find(fd);
     if(unlikely(it == m_sockets.end()))return;
-    
+    ::close(it->first);
     m_sockets.erase(it);
 }
 
 }
+
+#endif

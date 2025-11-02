@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <memory>
 #include <string>
+#include <string.h>
 
 namespace furina{
 
@@ -14,6 +15,11 @@ public:
 
     static InetAddress::ptr createAddr(const char* ipv4, uint16_t port);
     static InetAddress::ptr createEmptyAddr();
+    static InetAddress::ptr fromString(const std::string& addr);
+
+    bool operator==(const InetAddress& y){
+        return memcmp(&m_addr, &y.m_addr, sizeof(m_addr)) == 0;
+    }
 
     InetAddress(const char* ipv4, uint16_t port);
     InetAddress() = delete;

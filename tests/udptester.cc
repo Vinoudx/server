@@ -1,59 +1,64 @@
-#include <arpa/inet.h>
-#include <unistd.h>
-#include <cstring>
 #include <iostream>
 #include <thread>
-#include <vector>
+#include <string>
+#include <cstring>
+#include <arpa/inet.h>
+#include <unistd.h>
 
-void send_task(const char* ip, int port, int thread_id, int duration_sec) {
-    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0) {
-        perror("socket");
-        return;
-    }
+constexpr int BUFFER_SIZE = 1024;
 
-    sockaddr_in servaddr{};
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(port);
-    inet_pton(AF_INET, ip, &servaddr.sin_addr);
-
-    char msg[64];
-    snprintf(msg, sizeof(msg), "Hello from thread %d", thread_id);
-
-    auto start = std::chrono::steady_clock::now();
-    int count = 0;
+void receiveMessages(int sock) {
+    char buffer[BUFFER_SIZE];
+    sockaddr_in serverAddr;
+    socklen_t addrLen = sizeof(serverAddr);
 
     while (true) {
-        sendto(sockfd, msg, strlen(msg), 0, (struct sockaddr*)&servaddr, sizeof(servaddr));
-        count++;
-
-        auto now = std::chrono::steady_clock::now();
-        if (std::chrono::duration<double>(now - start).count() > duration_sec)
-            break;
+        ssize_t recvLen = recvfrom(sock, buffer, BUFFER_SIZE - 1, 0,
+                                   (sockaddr*)&serverAddr, &addrLen);
+        if (recvLen > 0) {
+            buffer[recvLen] = '\0';
+            std::cout << "\n[Server] " << buffer << std::endl;
+            std::cout << "> "; // 提示符
+            std::cout.flush();
+        }
     }
-
-    std::cout << "Thread " << thread_id << " sent " << count << " packets\n";
-    close(sockfd);
 }
 
-int main(int argc, char* argv[]) {
-    if (argc < 4) {
-        std::cout << "Usage: " << argv[0] << " <server_ip> <port> <threads>\n";
-        return 0;
+int main() {
+    std::string serverIp = "127.0.0.1";
+    int serverPort = 8890;
+
+    std::cout << "Enter server IP: ";
+    std::cout << "Enter server port: ";
+
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock < 0) {
+        perror("socket");
+        return 1;
     }
 
-    const char* ip = argv[1];
-    int port = atoi(argv[2]);
-    int threads = atoi(argv[3]);
-    int duration = 10; // 测试10秒
+    sockaddr_in serverAddr{};
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(serverPort);
+    inet_pton(AF_INET, serverIp.c_str(), &serverAddr.sin_addr);
 
-    std::vector<std::thread> workers;
-    for (int i = 0; i < threads; i++) {
-        workers.emplace_back(send_task, ip, port, i, duration);
+    // 启动接收线程
+    std::thread recvThread(receiveMessages, sock);
+    recvThread.detach();
+
+    std::string message;
+    while (true) {
+        std::cout << "> ";
+        std::getline(std::cin, message);
+        if (message.empty()) break;
+
+        ssize_t sentLen = sendto(sock, message.c_str(), message.size(), 0,
+                                 (sockaddr*)&serverAddr, sizeof(serverAddr));
+        if (sentLen < 0) {
+            perror("sendto");
+        }
     }
 
-    for (auto& t : workers) t.join();
-
-    std::cout << "All threads finished.\n";
+    close(sock);
     return 0;
 }

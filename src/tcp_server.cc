@@ -43,8 +43,6 @@ void TcpServer::start(){
     m_isRunning = true;
     m_ios = IoScheduler::ptr(new IoScheduler(m_num_threads));    
     m_ios->start();
-    m_listen_socket = SocketManager::getInstance()->createTcpSocket();
-    m_listen_socket->setNonBlock();
     m_ios->schedule(std::bind(&TcpServer::handleConnection, this));
 }
 
@@ -54,6 +52,8 @@ void TcpServer::stop(){
 }
 
 void TcpServer::handleConnection(){
+    m_listen_socket = TcpSocket::createTcpSocket();
+    m_listen_socket->setNonBlock();
     int rt = 0;
     if(m_listen_socket->bind(m_local_address)){
         LOG_ERROR << "TcpServer::handleConnection() bind fail " << strerror(errno);
@@ -66,29 +66,32 @@ void TcpServer::handleConnection(){
     }
 
     while(m_isRunning){
-        InetAddress::ptr client = InetAddress::createEmptyAddr();
-        Socket::ptr client_socket = m_listen_socket->accept();    
+        TcpSocket::ptr client_socket = m_listen_socket->accept();
+        m_fd_to_socket.insert_or_assign(client_socket->getFd(), client_socket);
         LOG_INFO << "TcpServer::handleConnection() a new connetion established. "
                  << "peer addreess: " << client_socket->getPeerAddr()->dump()
                  << " fd = " << client_socket->getFd();
         m_ios->addEvent(client_socket->getFd(), READ, std::bind(&TcpServer::handleMessage, this, client_socket));
         if(m_connection_cb){
-            m_ios->schedule([client_socket, this]{m_connection_cb(std::move(client_socket), Timestamp::nowAbs());});
+            m_ios->schedule([client_socket, this]{m_connection_cb(client_socket, Timestamp::nowAbs());});
         }
     }
 }
 
-void TcpServer::handleMessage(Socket::ptr sock){
+void TcpServer::handleMessage(TcpSocket::ptr sock){
     if(sock->isClosed())return;
     auto buffer = Buffer::ptr(new Buffer);
     int n = sock->recv(buffer, 0);
     if(n == -1){
         LOG_ERROR << "TcpServer::handleMessage() recv fail " << strerror(errno)
                   << "from peer: " << sock->getPeerAddr()->dump();
+        sock->close();
         return;
     }else if(n == 0){
         LOG_INFO << "TcpServer::handleMessage() a connetion disconnected. "
                  << "peer addreess: " << sock->getPeerAddr()->dump();
+        sock->close();
+        m_fd_to_socket.erase(sock->getFd());
         if(m_connection_cb){
             m_ios->schedule([sock, this]{m_connection_cb(std::move(sock), Timestamp::nowAbs());});
         }          
@@ -98,9 +101,11 @@ void TcpServer::handleMessage(Socket::ptr sock){
             SchedulerThread* s_thread = getThisThreadSchedulerThread();
             s_thread->addTask([s_thread, sock, this, buffer]{
                 m_message_cb(sock, buffer, Timestamp::nowAbs());
-                if(!m_keepAlive)sock->close();
                 if(m_keepAlive){
                     s_thread->addEvent(sock->getFd(), READ, std::bind(&TcpServer::handleMessage, this, sock));
+                }else{
+                    sock->close();
+                    m_fd_to_socket.erase(sock->getFd());
                 }
             });
         }
@@ -112,6 +117,11 @@ void TcpServer::waitingForStop(){
     sigemptyset(&sigset);
     sigaddset(&sigset, SIGINT);
     sigaddset(&sigset, SIGTERM);
+    if (pthread_sigmask(SIG_BLOCK, &sigset, nullptr) != 0) {
+        LOG_ERROR << "TcpServer::waitingForStop() pthread_sigmask";
+        stop();
+        return;
+    }
     int sig;
     sigwait(&sigset, &sig);
     LOG_INFO << "Server closed due to Ctrl+C";

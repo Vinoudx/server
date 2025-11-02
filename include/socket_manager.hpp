@@ -1,5 +1,7 @@
 #pragma once
 
+#if 0
+
 #include <sys/socket.h>
 #include <unordered_map>
 #include <shared_mutex>
@@ -30,3 +32,5 @@ private:
 };
 
 }
+
+#endif

@@ -5,30 +5,30 @@
 
 using namespace furina;
 
-void onMsg(Socket::ptr sock, Buffer::ptr buffer, Timestamp time){
+void onMsg(TcpSocket::ptr sock, Buffer::ptr buffer, Timestamp time){
     std::string s = buffer->readString();
     LOG_INFO << s;
-    std::string responce = "HTTP/1.1 200 OK\r\n"
-                "Content-Type: text/html\r\n"
-                "Content-Length: 13\r\n"
-                "\r\n"
-                "Hello World!";
-    sock->send(responce, 0);
+    // std::string responce = "HTTP/1.1 200 OK\r\n"
+    //             "Content-Type: text/html\r\n"
+    //             "Content-Length: 13\r\n"
+    //             "\r\n"
+    //             "Hello World!";
+    sock->send(s, 0);
 }
 
-void onMsgUdp(Socket::ptr sock, Buffer::ptr buffer, Timestamp time){
+void onMsgUdp(UdpSocket::ptr sock, Buffer::ptr buffer, Timestamp time){
     std::string s = buffer->readString();
     LOG_INFO << s;
     sock->sendto(s, 0);
 }
 
 int main(){
-    InetAddress::ptr addr = InetAddress::createAddr("127.0.0.1", 8889);
+    InetAddress::ptr addr = InetAddress::createAddr("127.0.0.1", 8890);
     TcpServer s(1, addr);
     // UdpServer s(1, addr);
 
     s.setMessageCallback(onMsg);
-    // s.setKeepAlive(true);
+    s.setKeepAlive(true);
     s.start();
     s.waitingForStop();
 

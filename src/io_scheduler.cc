@@ -54,7 +54,6 @@ void IoScheduler::schedule(Fiber::ptr fiber){
 
 void IoScheduler::addEvent(int fd, int event, std::function<void()> cb){
     size_t index = getNextIndex();
-    // LOG_DEBUG << "add event at index " << index;
     m_threads[index]->addEvent(fd, event, cb);
     m_fd_to_index[fd] = index;
 }
@@ -89,6 +88,7 @@ void IoScheduler::delTimer(TimerTask::ptr timer){
 }
 
 void IoScheduler::stop(){
+    if(m_closed)return;
     m_closed = true;
     for(auto& thread: m_threads){
         thread->stop();

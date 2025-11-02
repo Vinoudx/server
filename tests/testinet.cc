@@ -47,7 +47,7 @@ void serverfunc(){
 
 void serverfunc1(){
     // int sock = socket(AF_INET, SOCK_STREAM, 0);
-    auto sock = SocketManager::getInstance()->createTcpSocket();
+    auto sock = TcpSocket::createTcpSocket();
     int rt = 0;
     sock->setReuseAddr();
     auto addr = InetAddress::createAddr("127.0.0.1", (uint16_t)8123);
@@ -98,7 +98,7 @@ void clientsocket(){
 
 void clientsocket1(){
     // int sock = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
-    auto sock = SocketManager::getInstance()->createTcpSocket();
+    auto sock = TcpSocket::createTcpSocket();
     int rt = 0;
     // struct sockaddr_in addr;
     // memset(&addr, 0, sizeof(addr));

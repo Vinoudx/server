@@ -1,6 +1,8 @@
 #include "AsyncLogger.hpp"
 
 #include <iostream>
+
+#include <unistd.h>
 namespace furina{
 
 vecBuffer::vecBuffer():capacity(16),remaining_(capacity){
@@ -111,7 +113,7 @@ void AsyncLogger::threadFunc(){
         for(auto& item: buffers){
             if(!item)continue;
             for(auto& contents: item->getBuffer()){
-                ssize_t n = write(contents.first, contents.second.c_str(), contents.second.size());
+                ssize_t n = ::write(contents.first, contents.second.c_str(), contents.second.size());
             }
             item->setEmpty();
             if(bufferC_ == nullptr){
