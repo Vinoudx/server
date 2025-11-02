@@ -39,6 +39,9 @@ public:
     // 如果没事件了要把这个东西删掉
     void delEvent(int fd, int event);
     void delAllEvents(int fd);
+    // 在epoll关闭时让所有fd上的回调触发一下
+    void cancelEvent(int fd, int event);
+    void cancelAllEvents(int fd);
 
 private:
 

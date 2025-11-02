@@ -36,6 +36,7 @@ protected:
     int m_protocal;
     InetAddress::ptr m_peer_address;
     InetAddress::ptr m_local_address;
+
 };
 
 

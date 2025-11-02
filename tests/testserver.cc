@@ -23,12 +23,12 @@ void onMsgUdp(UdpSocket::ptr sock, Buffer::ptr buffer, Timestamp time){
 }
 
 int main(){
-    InetAddress::ptr addr = InetAddress::createAddr("127.0.0.1", 8890);
-    TcpServer s(1, addr);
-    // UdpServer s(1, addr);
+    InetAddress::ptr addr = InetAddress::createAddr("127.0.0.1", 8891);
+    // TcpServer s(1, addr);
+    UdpServer s(1, addr);
 
-    s.setMessageCallback(onMsg);
-    s.setKeepAlive(true);
+    s.setMessageCallback(onMsgUdp);
+    // s.setKeepAlive(true);
     s.start();
     s.waitingForStop();
 

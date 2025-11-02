@@ -8,6 +8,7 @@
 #include "logger.hpp"
 #include "macro.hpp"
 #include "scheduler_thread.hpp"
+#include "io_scheduler.hpp"
 
 namespace furina{
 
@@ -51,7 +52,7 @@ bool Socket::setNonBlock(){
         LOG_ERROR << "TcpSocket::setNonBlock() fail" << strerror(errno);
         return false;
     }
-    if (fcntl(m_fd, F_SETFL, flags & O_NONBLOCK) == -1) {
+    if (fcntl(m_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
         LOG_ERROR << "TcpSocket::setNonBlock() fail" << strerror(errno);
         return false;
     }
@@ -151,6 +152,7 @@ TcpSocket::ptr TcpSocket::accept(){
     }
     InetAddress::ptr addr = InetAddress::createEmptyAddr();
     int new_fd = SocketHook::accept(m_fd, addr->getMutableAddr(), addr->getMutableLength());
+    if(new_fd == 0 || new_fd == -1)return nullptr;
     TcpSocket::ptr new_sock = std::shared_ptr<TcpSocket>(new TcpSocket(new_fd, addr));
     new_sock->setNonBlock();
     new_sock->setNoDelay();
@@ -178,17 +180,16 @@ void TcpSocket::close(){
     if(!m_isValid)return;
     m_isValid = false;
     SchedulerThread* ios = getThisThreadSchedulerThread();
-    ios->delAllEvents(m_fd);
+    if(ios)ios->delAllEvents(m_fd);
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-UdpSocket::UdpSocket(int protocal):Socket(::socket(AF_INET, SOCK_DGRAM, protocal)){
+UdpSocket::UdpSocket(int protocal):Socket(::socket(AF_INET, SOCK_DGRAM | SOCK_NONBLOCK, protocal)){
     m_protocal = protocal;
 }
 
 UdpSocket::~UdpSocket(){
-    LOG_DEBUG << "fd " << m_fd << " closed";
     this->close();
     ::close(m_fd);
     m_isValid = false;
@@ -236,7 +237,7 @@ void UdpSocket::close(){
     if(!m_isValid)return;
     m_isValid = false;
     SchedulerThread* ios = getThisThreadSchedulerThread();
-    ios->delAllEvents(m_fd);
+    if(ios)ios->delAllEvents(m_fd);
 }
 
 }

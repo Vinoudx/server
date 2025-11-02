@@ -39,11 +39,7 @@ void UdpServer::start(){
     m_ios = IoScheduler::ptr(new IoScheduler(m_num_threads));    
     m_ios->start();
     for(int i = 0; i < m_num_threads; i++){
-        UdpSocket::ptr sock = UdpSocket::createUdpSocket();
-        sock->setReuseAddr();
-        sock->setNonBlock();
-        sock->bind(m_local_address);
-        m_ios->addEvent(sock->getFd(), READ, std::bind(&UdpServer::handleMessage, this, sock));
+        m_ios->schedule(std::bind(&UdpServer::handleConnection, this));
     }
 }
 
@@ -52,14 +48,25 @@ void UdpServer::stop(){
     m_ios->stop();
 }
 
+void UdpServer::handleConnection(){
+    UdpSocket::ptr sock = UdpSocket::createUdpSocket();
+    sock->setReuseAddr();
+    sock->setNonBlock();
+    sock->bind(m_local_address);
+    handleMessage(sock);
+}
+
 void UdpServer::handleMessage(UdpSocket::ptr sock){
     if(sock->isClosed())return;
     auto buffer = Buffer::ptr(new Buffer);
     int n = sock->recvfrom(buffer, 0);
-    LOG_DEBUG << n << " from " << sock->getPeerAddr()->dump();
     if(n == -1){
         LOG_ERROR << "UdpServer::handleMessage() recvfrom fail " << strerror(errno)
                   << "from peer: " << sock->getPeerAddr()->dump();
+        sock->close();
+        return;
+    }if(n == 0){
+        sock->close();
         return;
     }else{
         if(m_message_cb){
@@ -67,7 +74,7 @@ void UdpServer::handleMessage(UdpSocket::ptr sock){
             SchedulerThread* s_thread = getThisThreadSchedulerThread();
             s_thread->addTask([s_thread, sock, this, buffer]{
                 m_message_cb(sock, buffer, Timestamp::nowAbs());
-                s_thread->addEvent(sock->getFd(), READ, std::bind(&UdpServer::handleMessage, this, sock));
+                s_thread->addTask(std::bind(&UdpServer::handleMessage, this, sock));
             });
         }
     }

@@ -18,7 +18,6 @@ Thread::~Thread(){
     }
     m_cb = nullptr;
     sem_destroy(&m_sem);
-    LOG_DEBUG << "thread exit";
 }
 
 void Thread::threadMainFunc(){

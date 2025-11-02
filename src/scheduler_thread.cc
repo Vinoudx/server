@@ -84,18 +84,6 @@ void SchedulerThread::onFiberReady(Fiber::ptr fiber){
 }
 
 void SchedulerThread::onFiberHold(Fiber::ptr fiber){
-    // // LOG_DEBUG << "on fiber hold " << fiber.get();
-    // std::lock_guard<std::mutex> l(m_mtx);
-    // // 将fiber移动到hold队列
-    // for(auto it = m_ready_queue.begin(); it != m_ready_queue.end(); ++it){
-    //     if(*it == fiber){
-    //         m_hold_queue.emplace_back(std::move(*it));
-    //         m_ready_queue.erase(it);
-    //         m_num_ready_fibers--;
-    //         m_num_hold_fibers++;
-    //         break;
-    //     }
-    // }
 }
 
 void SchedulerThread::addTask(Fiber::ptr fiber){
@@ -118,7 +106,7 @@ void SchedulerThread::run(){
     setRootFiber(nullptr);
     s_this_thread_scheduler = this;
     LOG_DEBUG << "RUN";
-    setThisThreadScheduler(m_scheduler);
+    // setThisThreadScheduler(m_scheduler);
     m_stopped = false;
     Fiber::ptr worker_fiber = nullptr;
     Fiber::ptr idle_fiber = std::shared_ptr<Fiber>(new Fiber(std::bind(&SchedulerThread::idle, this)));
@@ -139,7 +127,6 @@ void SchedulerThread::run(){
             }
         }
         if(worker_fiber != nullptr){
-            // LOG_DEBUG << "get task at " << worker_fiber.get();
             worker_fiber->swapIn();
             if(worker_fiber->getState() == Fiber::State::TERM || 
                 worker_fiber->getState() == Fiber::State::EXCE){
@@ -156,7 +143,8 @@ void SchedulerThread::run(){
                 m_hold_queue.emplace_back(std::move(worker_fiber));
             }
             worker_fiber = nullptr;
-        }else{
+        }else if(idle_fiber->getState() != Fiber::State::EXCE &&
+                idle_fiber->getState() != Fiber::State::TERM){
             idle_fiber->swapIn();
             if(idle_fiber->getState() == Fiber::State::EXCE ||
                 idle_fiber->getState() == Fiber::State::TERM){
@@ -181,17 +169,18 @@ void SchedulerThread::tickle(){
 }
 
 void SchedulerThread::idle(){
-    // LOG_DEBUG << "idle";
     std::vector<struct epoll_event> events;
     events.resize(s_epoll_max_events);
-    while(!stopping()){
+    while(!m_stopped){
         int n = epoll_wait(m_epoll, &(*events.begin()), events.size(), -1);
+        if(n == -1 && errno == EINTR){
+            continue;
+        }
         if(n == -1){
             LOG_ERROR << "SchedulerThread::idle() epoll_wait fail " << strerror(errno);
             continue;
         }
         for(int i = 0; i < n; i++){
-
             if(events[i].data.fd == m_pipe[1]){
                 char temp;
                 while (true) {
@@ -267,25 +256,26 @@ void SchedulerThread::idle(){
 }
 
 void SchedulerThread::stop(){
-    std::lock_guard<std::mutex> l(m_mtx);
+{   std::lock_guard<std::mutex> l(m_mtx);
     if(m_stopped){
         return;
     }
+    m_stopped = true;
+}
     std::vector<int> keys;
     for (auto& kv : m_events) {
         keys.push_back(kv.first);
     }
 
     for (int key : keys) {
-        delAllEvents(key);
+        cancelAllEvents(key);
     }
-    m_stopped = true;
     tickle();
 }
 
 bool SchedulerThread::stopping(){
-    // return m_stopped == true && m_ready_queue.empty() && m_hold_queue.empty() && m_events.empty();
-    return m_stopped;
+    return m_stopped == true && m_ready_queue.empty() && m_hold_queue.empty();
+    // return m_stopped;
 }
 
 void SchedulerThread::addEvent(int fd, int event, std::function<void()> cb){
@@ -358,6 +348,55 @@ void SchedulerThread::delAllEvents(int fd){
     delEvent(fd, EventContext::Event::WRITE);
 }
 
+void SchedulerThread::cancelEvent(int fd, int event){
+    auto it = m_events.find(fd);
+    if(it == m_events.end()){
+        return;
+    }
+    EventContext::ptr ctx = it->second;
+    if((ctx->registerd_events & event) == 0){
+        return;
+    }
+
+    int epoll_operation = 0;
+    if((ctx->registerd_events & ~event) == 0){
+        epoll_operation = EPOLL_CTL_DEL;
+        m_events.erase(fd);
+    }else{
+        epoll_operation = EPOLL_CTL_MOD;
+    }
+
+    struct epoll_event epollevent;
+    memset(&epollevent, 0, sizeof(epollevent));
+    epollevent.events = (ctx->registerd_events & ~event) | EPOLLET;
+    epollevent.data.fd = ctx->fd;
+    
+    if(epoll_ctl(m_epoll, epoll_operation, ctx->fd, &epollevent)){
+        LOG_ERROR << "SchedulerThread::delEvent() epoll_ctl fail " << strerror(errno);
+    }else{
+        if(event & EventContext::Event::READ){
+            addTask([ctx, event]{
+                ctx->registerd_events &= ~event;
+                errno = ECANCELED;
+                if(ctx->read_task)ctx->read_task();
+                ctx->read_task = nullptr;
+            });
+        }else if(event & EventContext::Event::WRITE){
+            addTask([ctx, event]{
+                ctx->registerd_events &= ~event;
+                errno = ECANCELED;
+                if(ctx->write_task)ctx->write_task();
+                ctx->write_task = nullptr;
+            });
+        }
+    }
+}
+
+void SchedulerThread::cancelAllEvents(int fd){
+    cancelEvent(fd, EventContext::Event::READ);
+    cancelEvent(fd, EventContext::Event::WRITE);
+}
+
 
 //////////////////////////////////////////////////////////////////////////////////
 
@@ -370,7 +409,6 @@ void SchedulerThread::EventContext::setActualEvents(int events){
 }
 
 void SchedulerThread::EventContext::handleEvent(){
-    LOG_DEBUG << "event " << actual_events << " on fd = " << fd; 
     if((actual_events & READ) && (registerd_events & READ)){
         thread->addTask(read_task);
         thread->delEvent(fd, READ);

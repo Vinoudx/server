@@ -22,7 +22,7 @@ IoScheduler::IoScheduler(size_t num_threads)
     :m_closed(true)
     ,m_roundrobin_next_index(0){
     
-    setThisThreadScheduler(this);
+    // setThisThreadScheduler(this);
     m_num_threads = num_threads;
 }
 

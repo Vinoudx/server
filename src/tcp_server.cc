@@ -67,15 +67,17 @@ void TcpServer::handleConnection(){
 
     while(m_isRunning){
         TcpSocket::ptr client_socket = m_listen_socket->accept();
+        if(client_socket == nullptr)continue;
         m_fd_to_socket.insert_or_assign(client_socket->getFd(), client_socket);
         LOG_INFO << "TcpServer::handleConnection() a new connetion established. "
                  << "peer addreess: " << client_socket->getPeerAddr()->dump()
                  << " fd = " << client_socket->getFd();
-        m_ios->addEvent(client_socket->getFd(), READ, std::bind(&TcpServer::handleMessage, this, client_socket));
+        m_ios->schedule(std::bind(&TcpServer::handleMessage, this, client_socket));
         if(m_connection_cb){
             m_ios->schedule([client_socket, this]{m_connection_cb(client_socket, Timestamp::nowAbs());});
         }
     }
+    m_listen_socket->close();
 }
 
 void TcpServer::handleMessage(TcpSocket::ptr sock){
@@ -102,7 +104,7 @@ void TcpServer::handleMessage(TcpSocket::ptr sock){
             s_thread->addTask([s_thread, sock, this, buffer]{
                 m_message_cb(sock, buffer, Timestamp::nowAbs());
                 if(m_keepAlive){
-                    s_thread->addEvent(sock->getFd(), READ, std::bind(&TcpServer::handleMessage, this, sock));
+                    s_thread->addTask(std::bind(&TcpServer::handleMessage, this, sock));
                 }else{
                     sock->close();
                     m_fd_to_socket.erase(sock->getFd());

@@ -26,7 +26,7 @@ void receiveMessages(int sock) {
 
 int main() {
     std::string serverIp = "127.0.0.1";
-    int serverPort = 8890;
+    int serverPort = 8891;
 
     std::cout << "Enter server IP: ";
     std::cout << "Enter server port: ";

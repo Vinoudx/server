@@ -34,6 +34,7 @@ public:
 private:
 
     void handleMessage(UdpSocket::ptr sock);
+    void handleConnection();
 
     InetAddress::ptr m_local_address;
     IoScheduler::ptr m_ios;
