@@ -240,4 +240,72 @@ void UdpSocket::close(){
     if(ios)ios->delAllEvents(m_fd);
 }
 
+////////////////////////////////////////////////////////////////////////////////////////
+
+KcpSocket::KcpSocket(uint32_t conv_id, int protocal):UdpSocket(protocal){
+    m_kcp = ikcp_create(conv_id, (void*)this);
+    m_kcp->output = KcpSocket::kcp_send_callback;
+    ikcp_nodelay(m_kcp, 1, 10, 2, 1);   // 极速模式
+    ikcp_wndsize(m_kcp, 128, 128);      // 发送窗口、接收窗口
+    ikcp_setmtu(m_kcp, 1400);           // MTU 一般 1400（留给 UDP/IP 头）
+    m_kcp->rx_minrto = 10;              // 最小RTO 10ms（默认100ms太慢）
+}
+
+KcpSocket::~KcpSocket(){
+    if(m_isValid){
+        this->close();  
+    }
+    ::close(m_fd);
+    m_isValid = false;
+}
+
+KcpSocket::ptr KcpSocket::createKcpSocket(uint32_t conv, int protocal){
+    return KcpSocket::ptr(new KcpSocket(conv, protocal));
+}
+
+uint64_t KcpSocket::getMilisecondForUpdate(){
+    using namespace std::chrono;
+    return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+}
+
+void KcpSocket::update(){
+    ikcp_update(m_kcp, KcpSocket::getMilisecondForUpdate());
+}
+
+ssize_t KcpSocket::recvfrom(Buffer::ptr buffer, int flags){
+    char temp[4096] = {0};
+    std::string t;
+    int hr = 0;
+    while(true){
+        hr = ikcp_recv(m_kcp, temp, 4096);
+        if(hr <= 0)break;
+        t.append(temp, hr);
+    }
+    buffer->writeString(t);
+    return t.size();
+}
+
+void KcpSocket::setKcp(const char* buf, size_t len){
+    ikcp_input(m_kcp, buf, len);
+}
+
+ssize_t KcpSocket::sendto(const std::string& buffer, int flags){
+    m_flag_context = flags;
+    return ikcp_send(m_kcp, buffer.c_str(), buffer.size());
+}
+
+void KcpSocket::close(){
+    if(!m_isValid)return;
+    ikcp_release(m_kcp);
+    m_isValid = false;
+    // SchedulerThread* ios = getThisThreadSchedulerThread();
+    // if(ios)ios->delAllEvents(m_fd);
+}
+
+int KcpSocket::kcp_send_callback(const char* buf, int len, ikcpcb* kcp, void* user){
+    KcpSocket* sock = static_cast<KcpSocket*>(user);
+    return SocketHook::sendto(sock->m_fd, buf, len, sock->m_flag_context, sock->m_peer_address->getAddr(), sock->m_peer_address->getLength());
+}
+
+
 }

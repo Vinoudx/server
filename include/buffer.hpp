@@ -36,10 +36,13 @@ public:
     void readNBytes(char* buffer, size_t n);
     void writeNBytes(const char* buffer, size_t n);
 
+    std::string peekString();
+    uint64_t peekUint64();
+
 private:
 
     void write(const void* buf, size_t size);
-    void read(void* buf, size_t size);
+    void read(void* buf, size_t size, size_t& read_begin);
 
     size_t advance(size_t ptr, size_t n);
 
@@ -52,6 +55,7 @@ private:
     size_t m_capacity;
     size_t m_readBegin;
     size_t m_writeBegin;
+    size_t m_peekBegin;
 };
 
 }

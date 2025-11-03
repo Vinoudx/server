@@ -1,6 +1,9 @@
 #pragma once 
 
 #include <memory>
+#include <chrono>
+
+#include "ikcp.h"
 
 #include "address.hpp"
 #include "buffer.hpp"
@@ -76,14 +79,41 @@ public:
 
     static UdpSocket::ptr createUdpSocket(int protocal = 0);
 
-    ssize_t recvfrom(Buffer::ptr buffer, int flags = 0);
-    ssize_t sendto(const std::string& buffer, int flags = 0);
-    ssize_t sendto(const std::string& buffer, const InetAddress::ptr& addr, int flags = 0);
+    virtual ssize_t recvfrom(Buffer::ptr buffer, int flags = 0);
+    virtual ssize_t sendto(const std::string& buffer, int flags = 0);
+    virtual ssize_t sendto(const std::string& buffer, const InetAddress::ptr& addr, int flags = 0);
 
     int bind(InetAddress::ptr addr);
 
     void close();
 };
 
+class KcpSocket: public UdpSocket{
+public:
+    using ptr = std::shared_ptr<KcpSocket>;
+    static KcpSocket::ptr createKcpSocket(uint32_t conv, int protocal = 0);
+    static uint64_t getMilisecondForUpdate();
+
+    ~KcpSocket();
+
+    void update();
+
+    ssize_t recvfrom(Buffer::ptr buffer, int flags = 0) override;
+    ssize_t sendto(const std::string& buffer, int flags = 0) override;
+    void setKcp(const char* buf, size_t len);
+
+    void close();
+
+    void setPeerAddr(const InetAddress::ptr& addr){m_peer_address = addr;}
+
+private:
+
+    static int kcp_send_callback(const char* buf, int len, ikcpcb* kcp, void* user);
+
+    KcpSocket(uint32_t conv_id, int protocal = 0);
+
+    ikcpcb* m_kcp = nullptr;
+    int m_flag_context;
+};
 
 }

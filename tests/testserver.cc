@@ -1,5 +1,6 @@
 #include "tcp_server.hpp"
 #include "udp_server.hpp"
+#include "kcp_server.hpp"
 
 #include "logger.hpp"
 
@@ -22,12 +23,19 @@ void onMsgUdp(UdpSocket::ptr sock, Buffer::ptr buffer, Timestamp time){
     sock->sendto(s, 0);
 }
 
-int main(){
-    InetAddress::ptr addr = InetAddress::createAddr("127.0.0.1", 8891);
-    // TcpServer s(1, addr);
-    UdpServer s(1, addr);
+void onMsgKcp(KcpSocket::ptr sock, Buffer::ptr buffer, Timestamp time){
+    std::string s = buffer->readString();
+    LOG_INFO << s;
+    sock->sendto(s, 0);
+}
 
-    s.setMessageCallback(onMsgUdp);
+int main(){
+    InetAddress::ptr addr = InetAddress::createAddr("127.0.0.1", 8890);
+    // TcpServer s(1, addr);
+    // UdpServer s(1, addr);
+    KcpServer s(1, addr);
+
+    s.setMessageCallback(onMsgKcp);
     // s.setKeepAlive(true);
     s.start();
     s.waitingForStop();

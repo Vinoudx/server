@@ -10,6 +10,7 @@
 namespace furina{
 
 class InetAddress{
+    friend struct InetAddressHash;
 public:
     using ptr = std::shared_ptr<InetAddress>;
 
@@ -17,7 +18,7 @@ public:
     static InetAddress::ptr createEmptyAddr();
     static InetAddress::ptr fromString(const std::string& addr);
 
-    bool operator==(const InetAddress& y){
+    bool operator==(const InetAddress& y) const{
         return memcmp(&m_addr, &y.m_addr, sizeof(m_addr)) == 0;
     }
 
@@ -34,6 +35,13 @@ public:
 private:
     struct sockaddr_in m_addr;
     socklen_t m_len;
+};
+
+struct InetAddressHash{
+    size_t operator()(const furina::InetAddress& a) const noexcept {
+        return std::hash<uint32_t>()(a.m_addr.sin_addr.s_addr)
+             ^ (std::hash<uint16_t>()(a.m_addr.sin_port) << 1);
+    }
 };
 
 }

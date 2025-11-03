@@ -23,3 +23,6 @@ target_link_libraries(udptester PRIVATE pthread)
 
 add_executable(testudpbroadcast testudpbroadcast.cc ${SRC_LISTS})
 target_link_libraries(testudpbroadcast PRIVATE pthread)
+
+add_executable(testkcp testkcp.cc ${SRC_LISTS})
+target_link_libraries(testkcp PRIVATE pthread)

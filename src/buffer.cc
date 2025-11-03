@@ -43,7 +43,7 @@ std::string Buffer::readString(){
     uint64_t len = readUint64();
     std::string temp;
     temp.resize(len);
-    read(temp.data(), len);
+    read(temp.data(), len, m_readBegin);
     return temp;
 }
 
@@ -63,7 +63,7 @@ uint64_t Buffer::readUint64(){
     uint64_t result = 0;
     for(int i = 0; i < 64; i += 7){
         uint8_t temp = 0;
-        read((char*)&temp, 1);
+        read((char*)&temp, 1, m_readBegin);
         if(temp < 0x80){
             result |= ((uint64_t)temp) << i;
             break;
@@ -75,8 +75,25 @@ uint64_t Buffer::readUint64(){
     return result;
 }
 
+uint64_t Buffer::peekUint64(){
+    m_peekBegin = m_readBegin;
+    uint64_t result = 0;
+    for(int i = 0; i < 64; i += 7){
+        uint8_t temp = 0;
+        read((char*)&temp, 1, m_peekBegin);
+        if(temp < 0x80){
+            result |= ((uint64_t)temp) << i;
+            break;
+        }else{
+            result |= ((uint64_t)temp & 0x7f) << i;
+        }
+    }
+    // return byteswapToHostEndian(result);
+    return result; 
+}
+
 void Buffer::readNBytes(char* buffer, size_t n){
-    read(buffer, n);
+    read(buffer, n, m_readBegin);
 }
 
 void Buffer::writeNBytes(const char* buffer, size_t n){
@@ -118,22 +135,41 @@ void Buffer::write(const void* buf, size_t size){
     }
 }
 
-void Buffer::read(void* buf, size_t size){
+std::string Buffer::peekString(){
+    m_peekBegin = m_readBegin;
+    uint64_t result = 0;
+    for(int i = 0; i < 64; i += 7){
+        uint8_t temp = 0;
+        read((char*)&temp, 1, m_peekBegin);
+        if(temp < 0x80){
+            result |= ((uint64_t)temp) << i;
+            break;
+        }else{
+            result |= ((uint64_t)temp & 0x7f) << i;
+        }
+    }
+    std::string temp;
+    temp.resize(result);
+    read(temp.data(), result, m_peekBegin);
+    return temp;
+}
+
+void Buffer::read(void* buf, size_t size, size_t& read_begin){
     if(readableBytes() < size)[[unlikely]]{
         LOG_ERROR << "has " << readableBytes() << " Bytes, but need " << size << " Bytes";
         throw std::logic_error("no enough data");
     }
-    if(m_capacity - m_readBegin >= size){
+    if(m_capacity - read_begin >= size){
         // 到结尾读的完
-        memcpy(buf, m_buffer + m_readBegin, size);
-        m_readBegin = advance(m_readBegin, size);
+        memcpy(buf, m_buffer + read_begin, size);
+        read_begin = advance(read_begin, size);
     }else{
         // 到结尾读不完
-        size_t readBytes = m_capacity - m_readBegin;
-        memcpy(buf, m_buffer + m_readBegin, readBytes);
-        m_readBegin = advance(m_readBegin, readBytes);
-        memcpy((char*)buf + readBytes, m_buffer + m_readBegin, size - readBytes);
-        m_readBegin = advance(m_readBegin, size - readBytes);
+        size_t readBytes = m_capacity - read_begin;
+        memcpy(buf, m_buffer + read_begin, readBytes);
+        read_begin = advance(read_begin, readBytes);
+        memcpy((char*)buf + readBytes, m_buffer + read_begin, size - readBytes);
+        read_begin = advance(read_begin, size - readBytes);
     }
 }
 
