@@ -31,12 +31,12 @@ void onMsgKcp(KcpSocket::ptr sock, Buffer::ptr buffer, Timestamp time){
 
 int main(){
     InetAddress::ptr addr = InetAddress::createAddr("127.0.0.1", 8890);
-    // TcpServer s(1, addr);
+    TcpServer s(16, addr);
     // UdpServer s(1, addr);
-    KcpServer s(1, addr);
+    // KcpServer s(1, addr);
 
-    s.setMessageCallback(onMsgKcp);
-    // s.setKeepAlive(true);
+    s.setMessageCallback(onMsg);
+    s.setKeepAlive(true);
     s.start();
     s.waitingForStop();
 

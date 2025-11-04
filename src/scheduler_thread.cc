@@ -172,7 +172,7 @@ void SchedulerThread::idle(){
     std::vector<struct epoll_event> events;
     events.resize(s_epoll_max_events);
     while(!m_stopped){
-        int n = epoll_wait(m_epoll, &(*events.begin()), events.size(), -1);
+        int n = epoll_wait(m_epoll, &(*events.begin()), events.size(), 1000);
         if(n == -1 && errno == EINTR){
             continue;
         }
@@ -183,26 +183,27 @@ void SchedulerThread::idle(){
         for(int i = 0; i < n; i++){
             if(events[i].data.fd == m_pipe[1]){
                 char temp;
-                while (true) {
-                    ssize_t n = read(m_pipe[0], &temp, sizeof(char));
-                    if (n > 0) {
-                        // 处理 n 字节
-                        break;
-                    } else if (n == 0) {
-                        // 对端关闭
-                        LOG_ERROR << "write side close";
-                        break;
-                    } else {
-                        if (errno == EINTR)
-                            continue; // 信号中断重试
-                        else if (errno == EAGAIN || errno == EWOULDBLOCK)
-                            break; // 缓冲区读完
-                        else {
-                            LOG_ERROR << "SchedulerThread::idle() read pipe fail " << strerror(errno);
-                            break;
-                        }
-                    }
-                }
+                // while (true) {
+                //     ssize_t n = read(m_pipe[0], &temp, sizeof(char));
+                //     if (n > 0) {
+                //         // 处理 n 字节
+                //         break;
+                //     } else if (n == 0) {
+                //         // 对端关闭
+                //         LOG_ERROR << "write side close";
+                //         break;
+                //     } else {
+                //         if (errno == EINTR)
+                //             continue; // 信号中断重试
+                //         else if (errno == EAGAIN || errno == EWOULDBLOCK)
+                //             break; // 缓冲区读完
+                //         else {
+                //             LOG_ERROR << "SchedulerThread::idle() read pipe fail " << strerror(errno);
+                //             break;
+                //         }
+                //     }
+                // }
+                while (read(m_pipe[0], &temp, 1) > 0) {}
                 Fiber::YeildToReady();
                 continue;
             }
@@ -409,6 +410,7 @@ void SchedulerThread::EventContext::setActualEvents(int events){
 }
 
 void SchedulerThread::EventContext::handleEvent(){
+    auto self = shared_from_this();
     if((actual_events & READ) && (registerd_events & READ)){
         thread->addTask(read_task);
         thread->delEvent(fd, READ);
@@ -420,6 +422,7 @@ void SchedulerThread::EventContext::handleEvent(){
     if((actual_events & EPOLLERR) | (actual_events & EPOLLHUP)){
         thread->delAllEvents(fd);
     }
+    self.reset();
 }
 
 }

@@ -45,7 +45,7 @@ public:
 
 private:
 
-    struct EventContext{
+    struct EventContext: public std::enable_shared_from_this<EventContext>{
         using ptr = std::shared_ptr<EventContext>;
         enum Event{
             NONE = 0,

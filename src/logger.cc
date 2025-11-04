@@ -81,7 +81,7 @@ namespace furina{
     }
 
     FileAppender::FileAppender(const std::string& filename):LogAppenderBase(),filename_(filename){
-        fd_ = open(filename_.c_str(), O_APPEND);
+        fd_ = open(filename_.c_str(), O_WRONLY | O_CREAT | O_APPEND, 0644);
         if(fd_ < 0){
             perror("open");
             fd_ = STDOUT_FILENO;
