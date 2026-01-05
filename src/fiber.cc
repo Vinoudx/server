@@ -14,7 +14,7 @@ static thread_local Fiber::ptr t_executing_fiber = nullptr;
 // static thread_local Fiber* t_this_thread_root_fiber = nullptr;
 // static thread_local Fiber* t_executing_fiber = nullptr;
 
-static size_t s_stack_size = 1024 * 1024;
+static size_t s_stack_size = 1024 * 1024; // 4KB
 
 Fiber::ptr getRootFiber(){
     return t_this_thread_root_fiber;
@@ -47,7 +47,6 @@ Fiber::Fiber():m_state(READY),m_stack(nullptr){
     if(getcontext(&m_context)){
         LOG_ERROR << "Fiber::Fiber() " << strerror(errno);
     }
-    // LOG_DEBUG << "Fiber::Fiber() main fiber " << m_id; 
 }
 
 Fiber::Fiber(std::function<void()> cb, StateListenerCallback rcb, StateListenerCallback bcb)
@@ -67,10 +66,8 @@ Fiber::Fiber(std::function<void()> cb, StateListenerCallback rcb, StateListenerC
     m_context.uc_stack.ss_size = m_stack_size;
     m_context.uc_stack.ss_sp = m_stack;
     m_context.uc_link = nullptr;
-
-    makecontext(&m_context, &Fiber::mainFunc, 0);
-    // LOG_DEBUG << "Fiber " << m_id << " created and start";
     changeState(READY);
+    makecontext(&m_context, &Fiber::mainFunc, 0);
 }
 
 Fiber::~Fiber(){
@@ -79,7 +76,6 @@ Fiber::~Fiber(){
     m_cb = nullptr;
     m_on_block_listenercb = nullptr;
     m_on_ready_listenercb = nullptr;
-    // LOG_DEBUG << "Fiber::~Fiber() id = " << m_id;
 }
 
 void Fiber::swapIn(){
@@ -120,10 +116,8 @@ void Fiber::reset(std::function<void()> cb, StateListenerCallback rcb, StateList
     m_context.uc_stack.ss_size = m_stack_size;
     m_context.uc_stack.ss_sp = m_stack;
     m_context.uc_link = nullptr;
-
-    makecontext(&m_context, &Fiber::mainFunc, 0);
-    // LOG_DEBUG << "Fiber " << m_id << " reset";
     changeState(READY);
+    makecontext(&m_context, &Fiber::mainFunc, 0);
 }
 
 void Fiber::YeildToHold(){

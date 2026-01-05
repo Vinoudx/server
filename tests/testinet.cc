@@ -67,10 +67,10 @@ void serverfunc1(){
     LOG_INFO << "connet from " << client_sock->getPeerAddr()->dump() << ' ' << client_sock->getLocalAddr()->dump();
     auto buffer = Buffer::ptr(new Buffer);    
     while(true){
-        int n = client_sock->recv(buffer, 0);
+        int n = client_sock->read(buffer);
         if(n == -1 || n == 0)break;
         std::string str = buffer->readString();
-        // LOG_INFO << str;
+        LOG_INFO << str;
         client_sock->send(str, 0);
     }
     LOG_INFO << "server stop";
@@ -124,17 +124,17 @@ void clientsocket1(){
 
 int main(){
 
-    IoScheduler iom(4);
+    IoScheduler iom(1);
     iom.start();
     iom.schedule(serverfunc1);
-    iom.schedule(serverfunc1);
-    iom.schedule(serverfunc1);
-    iom.schedule(serverfunc1);
+    // iom.schedule(serverfunc1);
+    // iom.schedule(serverfunc1);
+    // iom.schedule(serverfunc1);
     // iom.schedule(clientsocket1);
 
 
     while(true){
-        std::this_thread::sleep_for(std::chrono::seconds(60));
+        std::this_thread::sleep_for(std::chrono::seconds(600));
     }
     iom.stop();
     return 0;

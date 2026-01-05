@@ -1,4 +1,5 @@
 aux_source_directory(${PROJECT_SOURCE_DIR}/src SRC_LISTS)
+aux_source_directory(${PROJECT_SOURCE_DIR}/src/kcp SRC_LISTS)
 
 add_executable(testlogger testlogger.cc ${SRC_LISTS})
 target_link_libraries(testlogger PRIVATE pthread)
@@ -26,3 +27,5 @@ target_link_libraries(testudpbroadcast PRIVATE pthread)
 
 add_executable(testkcp testkcp.cc ${SRC_LISTS})
 target_link_libraries(testkcp PRIVATE pthread)
+
+add_subdirectory(${PROJECT_SOURCE_DIR}/tests/benchmarks)

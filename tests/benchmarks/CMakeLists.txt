@@ -1,0 +1,2 @@
+add_executable(memory_allocate_benchmark memory_allocate_benchmark.cc ${SRC_LISTS})
+target_link_libraries(memory_allocate_benchmark PRIVATE pthread)
